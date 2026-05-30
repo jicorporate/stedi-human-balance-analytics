@@ -18,19 +18,32 @@ job.init(args["JOB_NAME"], args)
 
 DATABASE_NAME = "stedi"
 
+CUSTOMER_LANDING_PATH = (
+    "s3://stedi-human-balance-analytics-jicorporate/customer/landing/"
+)
+
 CUSTOMER_TRUSTED_PATH = (
     "s3://stedi-human-balance-analytics-jicorporate/customer/trusted/"
 )
 
 
-customer_landing_dynamic_frame = glueContext.create_dynamic_frame.from_catalog(
-    database=DATABASE_NAME,
-    table_name="customer_landing",
+customer_landing_dynamic_frame = glueContext.create_dynamic_frame.from_options(
+    connection_type="s3",
+    connection_options={
+        "paths": [CUSTOMER_LANDING_PATH],
+        "recurse": True
+    },
+    format="json",
     transformation_ctx="customer_landing_dynamic_frame"
 )
 
 
 customer_landing_df = customer_landing_dynamic_frame.toDF()
+
+customer_landing_count = customer_landing_df.count()
+print("customer_landing_count =", customer_landing_count)
+
+customer_landing_df.printSchema()
 
 customer_landing_df.createOrReplaceTempView("customer_landing")
 
@@ -50,6 +63,22 @@ customer_trusted_df = spark.sql("""
     FROM customer_landing
     WHERE sharewithresearchasofdate IS NOT NULL
 """)
+
+
+customer_trusted_count = customer_trusted_df.count()
+print("customer_trusted_count =", customer_trusted_count)
+
+if customer_landing_count != 956:
+    raise Exception(
+        "Invalid customer_landing_count. Expected 956 but got "
+        + str(customer_landing_count)
+    )
+
+if customer_trusted_count != 482:
+    raise Exception(
+        "Invalid customer_trusted_count. Expected 482 but got "
+        + str(customer_trusted_count)
+    )
 
 
 customer_trusted_dynamic_frame = DynamicFrame.fromDF(
